@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gcode-thumbnail-tool"
+description = "Small tool to analyse and extract thumbnails rendered into GCODE files"
+version = "1.0.0"
+dependencies = [
+    "Pillow>=1.11.3",
+]
+requires-python = ">= 3.9"
+
+authors = [
+    {name = "Gina Häußge", email = "gina@octoprint.org"},
+    {name = "jneilliii"},
+]
+maintainers = [
+    {name = "Gina Häußge", email = "gina@octoprint.org"},
+]
+
+[project.scripts]
+gcode-thumbnail-tool = "gcode_thumbnail_tool:main"
