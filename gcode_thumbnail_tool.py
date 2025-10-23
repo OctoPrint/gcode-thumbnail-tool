@@ -67,13 +67,16 @@ MKS format:
 TODO: Single lines or multiple lines? Need sample!
 """
 
-REGEX_WEEDO = re.compile(r"W221$(?P<data>.+?)^W222", re.DOTALL | re.MULTILINE)
+REGEX_WEEDO = re.compile(
+    r"W221(?:\n|\r\n?)(?P<lines>(W220\s+.*?(?:\n|\r\n?))+)W222",
+    re.DOTALL | re.MULTILINE,
+)
 """
 Weedo format:
 
     W221<nl>
-    <hex encoded data><nl>
-    <more hex encoded data><nl>
+    W220 <hex encoded data><nl>
+    W220 <more hex encoded data><nl>
     [...]
     W222<nl>
 
@@ -162,7 +165,7 @@ def extract_thumbnails_from_gcode(gcode_path: str) -> Optional[ExtractedImages]:
         ("generic", (REGEX_GENERIC, _extract_generic_base64_thumbnails)),
         ("snapmaker", (REGEX_SNAPMAKER, _extract_generic_base64_thumbnails)),
         ("mks", (REGEX_MKS, _extract_mks_thumbnails)),
-        ("weedo", (REGEX_WEEDO, _extract_generic_hex_thumbnails)),
+        ("weedo", (REGEX_WEEDO, _extract_weedo_thumbnails)),
         ("qidi", (REGEX_QIDI, _extract_qidi_thumbnails)),
         ("flashprint", _extract_flashprint_thumbnails),
         ("creality", (REGEX_CREALITY, _extract_generic_base64_thumbnails)),
@@ -286,6 +289,20 @@ def _extract_mks_thumbnails(matches: list[re.Match]) -> list[PILImage]:
             extracted.add(prefix)
 
             break
+
+    return result
+
+
+def _extract_weedo_thumbnails(matches: list[re.Match]) -> list[PILImage]:
+    result = []
+
+    for match in matches:
+        lines = [
+            line[len("M220 ") :].strip() for line in match.group("lines").splitlines()
+        ]
+
+        hex_data = _remove_whitespace("".join(lines))
+        result.append(_image_from_hex(hex_data))
 
     return result
 
