@@ -1,0 +1,28 @@
+version: "3"
+
+tasks:
+  update-readme:
+    cmds:
+      - |
+        help_output=$(gcode-thumbnail-tool)
+        extract_output=$(gcode-thumbnail-tool extract --help)
+        analyse_output=$(gcode-thumbnail-tool analyse --help)
+
+        awk -i inplace -v text="$help_output" '
+          BEGIN{p=1}
+          $1=="<!--INSERT:help-->"{p=0;print;next}
+          $1=="<!--/INSERT:help-->"{print "```\n" text "\n```"; p=1}
+          p
+        ' README.md
+        awk -i inplace -v text="$extract_output" '
+          BEGIN{p=1}
+          $1=="<!--INSERT:extract-->"{p=0;print;next}
+          $1=="<!--/INSERT:extract-->"{print "```\n" text "\n```"; p=1}
+          p
+        ' README.md
+        awk -i inplace -v text="$analyse_output" '
+          BEGIN{p=1}
+          $1=="<!--INSERT:analyse-->"{p=0;print;next}
+          $1=="<!--/INSERT:analyse-->"{print "```\n" text "\n```"; p=1}
+          p
+        ' README.md

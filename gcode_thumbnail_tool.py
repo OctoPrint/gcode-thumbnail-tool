@@ -504,23 +504,29 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog="gcode-thumbnail-tool",
-        description="A small CLI tool to extract thumbnail images from GCODE files",
+        description="A small CLI tool to extract thumbnail images from GCODE files.",
     )
-    parser.add_argument("--verbose", "-v", dest="verbosity", action="count")
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        dest="verbosity",
+        action="count",
+        help="increase logging verbosity",
+    )
     subparsers = parser.add_subparsers(dest="subcommand")
 
     extract_parser = subparsers.add_parser(
-        "extract", help="Extracts thumbnails from the provided file as PNGs"
+        "extract", help="extracts thumbnails from the provided file as PNGs"
     )
-    extract_parser.add_argument("path", help="Path to the GCODE file")
+    extract_parser.add_argument("path", help="path to the GCODE file")
     extract_parser.add_argument(
-        "-o", "--output", dest="output", help="Output path for the extracted thumbnails"
+        "-o", "--output", dest="output", help="output path for the extracted thumbnails"
     )
 
     analyse_parser = subparsers.add_parser(
-        "analyse", help="Provides information on the GCODE file's thumbnails"
+        "analyse", help="provides information on the GCODE file's thumbnails"
     )
-    analyse_parser.add_argument("path", help="Path to the GCODE file")
+    analyse_parser.add_argument("path", help="path to the GCODE file")
 
     args = parser.parse_args()
     if not args.subcommand:
