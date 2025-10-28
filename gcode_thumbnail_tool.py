@@ -129,7 +129,7 @@ class ExtractedBytes:
     images: dict[str, bytes]
 
 
-def _potential_lines(path: str) -> str:
+def _potential_lines_from_gcode_file(path: str) -> str:
     if not os.path.exists(path):
         return ""
 
@@ -151,20 +151,40 @@ def _potential_lines(path: str) -> str:
     return "".join(content_lines).replace("\r\n", "\n").replace(";\n;\n", ";\n\n;\n")
 
 
-def extract_thumbnails_from_gcode(gcode_path: str) -> Optional[ExtractedImages]:
+def _to_thumbnail_bytes(extracted: ExtractedImages, format="PNG") -> ExtractedBytes:
+    data = {}
+    for image in extracted.images:
+        sizehint = _image_to_sizehint(image)
+        if sizehint in data:
+            continue
+        data[sizehint] = _image_to_bytes(image, format=format)
+    return ExtractedBytes(extractor=extracted.extractor, images=data)
+
+
+def extract_thumbnails_from_gcode_file(gcode_path: str) -> Optional[ExtractedImages]:
     logger = logging.getLogger(__name__)
+
+    if not os.path.exists(gcode_path):
+        logger.warning(f"Gcode file {gcode_path} doesn't exist")
+        return None
 
     logger.info(f"Extracting thumbnails from {gcode_path}...")
 
-    potential_lines = _potential_lines(gcode_path)
+    potential_lines = _potential_lines_from_gcode_file(gcode_path)
     logger.debug(
         f"Searching for matches in:\n{_prefix_lines(potential_lines, prefix=' | ')}"
     )
 
+    return extract_thumbnails_from_gcode(potential_lines)
+
+
+def extract_thumbnails_from_gcode(gcode: str) -> Optional[ExtractedImages]:
+    logger = logging.getLogger(__name__)
+
     extractors = [
         ("generic", (REGEX_GENERIC, _extract_generic_base64_thumbnails)),
         ("snapmaker", (REGEX_SNAPMAKER, _extract_generic_base64_thumbnails)),
-        ("mks", (REGEX_MKS, _extract_mks_thumbnails)),
+        # ("mks", (REGEX_MKS, _extract_mks_thumbnails)),
         ("weedo", (REGEX_WEEDO, _extract_weedo_thumbnails)),
         ("qidi", (REGEX_QIDI, _extract_qidi_thumbnails)),
         ("flashprint", _extract_flashprint_thumbnails),
@@ -176,45 +196,39 @@ def extract_thumbnails_from_gcode(gcode_path: str) -> Optional[ExtractedImages]:
             # regex based extractor
             regex, extractor = tooling
 
-            matches = list(regex.finditer(potential_lines))
+            matches = list(regex.finditer(gcode))
             if matches:
                 logger.debug(f"Detected {name} thumbnails, extracting...")
                 return ExtractedImages(extractor=name, images=extractor(matches))
 
         elif callable(tooling):
             # custom extractor function
-            thumbnails = tooling(gcode_path, potential_lines)
+            thumbnails = tooling(gcode)
             if thumbnails:
                 return ExtractedImages(extractor=name, images=thumbnails)
-
-    # none of the regex based extractors matched, could this be flashprint?
-    with open(gcode_path, "rb") as f:
-        f.seek(58)
-        buffer = f.read(14454)
-        if buffer[0] == 0x42 and buffer[1] == 0x4D:  # BMP magic numbers
-            logger.debug("Detected flashprint thumbnails, extracting...")
-            return ExtractedImages(
-                extractor="flashprint", images=_extract_flashprint_thumbnails(buffer)
-            )
 
     # if we reach this point, we could not find any thumbnails
     return None
 
 
-def extract_thumbnail_bytes_from_gcode(
+def extract_thumbnail_bytes_from_gcode_file(
     gcode_path: str, format="PNG"
 ) -> Optional[ExtractedBytes]:
-    result = extract_thumbnails_from_gcode(gcode_path)
+    result = extract_thumbnails_from_gcode_file(gcode_path)
     if not result:
         return None
 
-    data = {}
-    for image in result.images:
-        sizehint = _image_to_sizehint(image)
-        if sizehint in data:
-            continue
-        data[sizehint] = _image_to_bytes(image, format=format)
-    return ExtractedBytes(extractor=result.extractor, images=data)
+    return _to_thumbnail_bytes(result, format=format)
+
+
+def extract_thumbnail_bytes_from_gcode(
+    gcode: str, format="PNG"
+) -> Optional[ExtractedBytes]:
+    result = extract_thumbnails_from_gcode(gcode)
+    if not result:
+        return None
+
+    return _to_thumbnail_bytes(result, format=format)
 
 
 # ~~ extractors
@@ -245,24 +259,7 @@ def _extract_generic_base64_thumbnails(matches: list[re.Match]) -> list[PILImage
     return result
 
 
-def _extract_generic_hex_thumbnails(matches: list[re.Match]) -> list[PILImage]:
-    """
-    Extracts thumbnails from hex encoded data
-
-    Will remove any comment prefixes from lines.
-
-    Expected match groups:
-    * ``data``: hex encoded data
-    """
-    result = []
-    for match in matches:
-        data = _remove_whitespace(_remove_comment_prefix(match.group("data")))
-        image = _image_from_hex(data)
-        result.append(image)
-    return result
-
-
-def _extract_mks_thumbnails(matches: list[re.Match]) -> list[PILImage]:
+def _extract_old_mks_thumbnails(matches: list[re.Match]) -> list[PILImage]:
     """Extracts a thumbnail from hex binary data used by MKS printers"""
 
     OPTIONS = {";;gimage": (200, 200), ";simage": (100, 100)}
@@ -392,10 +389,13 @@ def _extract_qidi_thumbnails(matches: list[re.Match]) -> list[PILImage]:
     return result
 
 
-def _extract_flashprint_thumbnails(path: str, _lines: str) -> list[PILImage]:
-    with open(path, "rb") as f:
+def _extract_flashprint_thumbnails(gcode: str) -> list[PILImage]:
+    with io.BytesIO(gcode.encode()) as f:
         f.seek(58)
         buffer = f.read(14454)
+
+    if not len(buffer) == 14454:
+        return {}
 
     if not (buffer[0] == 0x42 and buffer[1] == 0x4D):  # BMP magic numbers
         return {}
@@ -534,7 +534,7 @@ def main():
             print(f"{args.path} doesn't exist, exiting!", file=sys.stderr)
             sys.exit(1)
 
-        result = extract_thumbnail_bytes_from_gcode(args.path, format="PNG")
+        result = extract_thumbnail_bytes_from_gcode_file(args.path, format="PNG")
         if result:
             output_folder = args.output
             if not output_folder:
@@ -559,7 +559,7 @@ def main():
             print(f"{args.path} doesn't exist, exiting!", file=sys.stderr)
             sys.exit(1)
 
-        result = extract_thumbnails_from_gcode(args.path)
+        result = extract_thumbnails_from_gcode_file(args.path)
         if result:
             print(
                 f'Found {len(result.images)} thumbnails in {args.path}, in format "{result.extractor}":'

@@ -21,3 +21,11 @@ maintainers = [
 
 [project.scripts]
 gcode-thumbnail-tool = "gcode_thumbnail_tool:main"
+
+[project.optional-dependencies]
+develop = [
+    # Testing dependencies
+    "pytest-doctest-custom>=1.0.0,<2",
+    "pytest>=8.3.4,<9",
+    "pre-commit",
+]
