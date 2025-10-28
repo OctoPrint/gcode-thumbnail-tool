@@ -17,7 +17,7 @@ maintainers = [
 ]
 
 dependencies = [
-    "Pillow>=1.11.3",
+    "Pillow>=11.3",
 ]
 requires-python = ">= 3.9"
 
