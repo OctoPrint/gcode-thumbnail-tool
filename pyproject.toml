@@ -6,26 +6,26 @@ build-backend = "setuptools.build_meta"
 name = "gcode-thumbnail-tool"
 description = "A small tool to analyse and extract thumbnails rendered into GCODE files"
 version = "0.1.0"
-dependencies = [
-    "Pillow>=1.11.3",
-]
-requires-python = ">= 3.9"
+readme = {file = "README.md", content-type = "markdown"}
 
 authors = [
     {name = "Gina Häußge", email = "gina@octoprint.org"},
-    {name = "jneilliii"},
+    {name = "jneilliii", email = "jneilliii+github@gmail.com"},
 ]
 maintainers = [
     {name = "Gina Häußge", email = "gina@octoprint.org"},
 ]
+
+dependencies = [
+    "Pillow>=1.11.3",
+]
+requires-python = ">= 3.9"
 
 [project.scripts]
 gcode-thumbnail-tool = "gcode_thumbnail_tool:main"
 
 [project.optional-dependencies]
 develop = [
-    # Testing dependencies
-    "pytest-doctest-custom>=1.0.0,<2",
-    "pytest>=8.3.4,<9",
+    "pytest",
     "pre-commit",
 ]
