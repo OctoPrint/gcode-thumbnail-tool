@@ -89,6 +89,7 @@ jobs:
           </details>
           EOF
 
+  test-install:
     name: 🧪 Installation test
     strategy:
       fail-fast: false
