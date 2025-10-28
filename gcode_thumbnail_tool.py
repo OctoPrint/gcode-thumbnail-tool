@@ -55,22 +55,27 @@ Luban format:
 Should be single lines only.
 """
 
-REGEX_MKS = re.compile(
-    r"(?P<prefix>;simage|;;gimage):(?P<data>.*?)M10086 ;$",
-    re.DOTALL | re.MULTILINE,
+REGEX_MKS_OLD = re.compile(
+    r"(?P<prefix>;simage|;?;gimage):(?P<lines>.*?(?:\n|\r\n?)(M10086\s*;.*?(?:\n|\r\n))*)M10086\s*;(?:\n|\r\n|$)"
 )
 """
-MKS format:
+Old MKS format:
 
-    ;simage:<hex encoded data>M10086;<nl>
+    ;simage:<hex encoded data><nl>
+    M10086 ;<hex encoded data><nl>
+    [...]
 
-TODO: Single lines or multiple lines? Need sample!
+    ;gimage:<hex encoded data><nl>
+    M10086 ;<hex encoded data><nl>
+    [...]
+    M10086 ;<nl>
+
+Spread across multiple lines
 """
 
-REGEX_WEEDO = re.compile(
-    r"W221(?:\n|\r\n?)(?P<lines>(W220\s+.*?(?:\n|\r\n?))+)W222",
-    re.DOTALL | re.MULTILINE,
-)
+REGEX_MKS_NEW = re.compile(r"", re.DOTALL | re.MULTILINE)
+
+REGEX_WEEDO = re.compile(r"W221(?:\n|\r\n?)(?P<lines>(W220\s+.*?(?:\n|\r\n?))+)W222")
 """
 Weedo format:
 
@@ -184,7 +189,7 @@ def extract_thumbnails_from_gcode(gcode: str) -> Optional[ExtractedImages]:
     extractors = [
         ("generic", (REGEX_GENERIC, _extract_generic_base64_thumbnails)),
         ("snapmaker", (REGEX_SNAPMAKER, _extract_generic_base64_thumbnails)),
-        # ("mks", (REGEX_MKS, _extract_mks_thumbnails)),
+        ("mks_old", (REGEX_MKS_OLD, _extract_old_mks_thumbnails)),
         ("weedo", (REGEX_WEEDO, _extract_weedo_thumbnails)),
         ("qidi", (REGEX_QIDI, _extract_qidi_thumbnails)),
         ("flashprint", _extract_flashprint_thumbnails),
@@ -260,32 +265,66 @@ def _extract_generic_base64_thumbnails(matches: list[re.Match]) -> list[PILImage
 
 
 def _extract_old_mks_thumbnails(matches: list[re.Match]) -> list[PILImage]:
-    """Extracts a thumbnail from hex binary data used by MKS printers"""
+    """
+    MKS extractor, old format
 
-    OPTIONS = {";;gimage": (200, 200), ";simage": (100, 100)}
+    Thumbnail blocks start with either ``;simage:`` or ``;;gimage:``. What follows
+    is a line of encoded pixel data, 2 bytes per RGB pixel in little endian, for the
+    first row of the image. Following rows are encoded with a leading
+    ``M10086 ;``, the data following in the same format, row by row. Finally, a
+    lone ``M10086 ;`` signifies the end.
+
+    Width and height can be determined directly from the data size (width is
+    length of first line in bytes / 2, height the amount of lines in total).
+
+    The individual pixels are encoded as RGB565. Bitshift accordingly to convert
+    back to RGB888.
+    """
+
+    logger = logging.getLogger(__name__)
+
+    def pop_short(byts: bytearray):
+        v1, v2 = byts.pop(0), byts.pop(0)
+        return v2 << 8 | v1  # convert back to big endian
+
+    def rgb565_to_rgb888(val: int) -> tuple[int, int, int]:
+        r = ((val >> 11) & 31) << 3
+        g = ((val >> 5) & 31) << 2
+        b = ((val) & 31) << 3
+        return r, g, b
 
     result = []
 
-    extracted = set()
+    logger.debug(f"Found {len(matches)} matches...")
     for match in matches:
-        for prefix, dimensions in OPTIONS.items():
-            if prefix in extracted:
-                continue
+        lines = _remove_line_prefix(match.group("lines"), r"M10086\s*;").splitlines()
 
-            if match.group("prefix") != prefix:
-                continue
+        height = len(lines)
+        width = 0
 
-            encoded_image = bytes(
-                bytearray.fromhex(_remove_whitespace(match.group("data")))
-            )
+        hex_bytes = bytearray()
+        for line in lines:
+            decoded = bytearray.fromhex(line)
+            if width == 0:
+                width = int(len(decoded) / 2)  # 2 hex encoded bytes per pixel
+            hex_bytes.extend(decoded)
 
-            image = Image.frombytes(
-                "RGB", dimensions, encoded_image, "raw", "BGR;16", 0, 1
-            )
-            result.append(image)
-            extracted.add(prefix)
+        logger.debug(
+            f"Found {len(hex_bytes)} bytes of image data, width is {width}, height is {height}"
+        )
 
-            break
+        pixel_data = bytearray()
+        pixel_count = 0
+        while len(hex_bytes):
+            rgb = rgb565_to_rgb888(pop_short(hex_bytes))
+            pixel_data.extend(rgb)
+            pixel_count += 1
+
+        logger.debug(f"Width: {width}, height: {height}, pixels: {pixel_count}")
+        assert pixel_count == width * height
+
+        image = Image.frombytes("RGB", (width, height), pixel_data, "raw", "RGB", 0, 1)
+        result.append(image)
 
     return result
 
@@ -326,9 +365,8 @@ def _extract_qidi_thumbnails(matches: list[re.Match]) -> list[PILImage]:
 
     The pixel count should match the width x height.
 
-    To convert to 24 bit color, bitshift to the right as needed to fetch
-    the 5 bits of the channel and then shift each value by 3 bits to the left
-    again.
+    The individual pixels are encoded as RGB555, with bit 5 having to be
+    ignored. Bitshift accordingly to convert back to RGB888.
     """
 
     logger = logging.getLogger(__name__)
@@ -336,11 +374,11 @@ def _extract_qidi_thumbnails(matches: list[re.Match]) -> list[PILImage]:
     RUNLENGTH_MASK_PIXEL = 32
     RUNLENGTH_MASK_NUM = 12288
 
-    def pop4b(byts: bytearray):
+    def pop_short(byts: bytearray):
         v1, v2 = byts.pop(0), byts.pop(0)
         return v1 << 8 | v2
 
-    def val2rgb(val: int) -> tuple[int, int, int]:
+    def rgb555_to_rgb888(val: int) -> tuple[int, int, int]:
         r = ((val >> 11) & 31) << 3
         g = ((val >> 6) & 31) << 3
         b = ((val) & 31) << 3
@@ -363,12 +401,12 @@ def _extract_qidi_thumbnails(matches: list[re.Match]) -> list[PILImage]:
         pixel_data = bytearray()
         pixel_count = 0
         while len(hex_bytes):
-            val = pop4b(hex_bytes)
-            pixel = val2rgb(val)
+            val = pop_short(hex_bytes)
+            pixel = rgb555_to_rgb888(val)
 
             if val & RUNLENGTH_MASK_PIXEL == RUNLENGTH_MASK_PIXEL:
                 # this is a repeated pixel, fetch the count!
-                val = pop4b(hex_bytes)
+                val = pop_short(hex_bytes)
                 assert val & RUNLENGTH_MASK_NUM == RUNLENGTH_MASK_NUM
 
                 for _ in range(val & 4095):
