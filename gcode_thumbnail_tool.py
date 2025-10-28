@@ -135,7 +135,7 @@ def _potential_lines_from_gcode_file(path: str) -> str:
 
     line_no = 0
     content_lines = []
-    with open(path, "r", encoding="utf8", errors="ignore") as f:
+    with open(path, encoding="utf8", errors="ignore") as f:
         line_no = 0
         for line in f:
             line_no += 1

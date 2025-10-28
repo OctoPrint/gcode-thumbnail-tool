@@ -38,7 +38,7 @@ def test_extract_thumbnails_from_gcode(
 def test_extract_thumbnails_from_gcode_file(
     filename: str, expected: tuple[str, list[tuple[str, int, int]]]
 ):
-    path = os.path.join(os.path.dirname(__file__), "files", filename)
+    path = os.path.join(os.path.dirname(__file__), "_files", filename)
     actual = gtt.extract_thumbnails_from_gcode_file(path)
     _verify_thumbnails(actual, expected)
 
@@ -61,7 +61,7 @@ def test_extract_thumbnail_bytes_from_gcode(
 def test_extract_thumbnail_bytes_from_gcode_file(
     filename: str, expected: tuple[str, list[tuple[str, int, int]]]
 ):
-    path = os.path.join(os.path.dirname(__file__), "files", filename)
+    path = os.path.join(os.path.dirname(__file__), "_files", filename)
     actual = gtt.extract_thumbnail_bytes_from_gcode_file(path)
     _verify_thumbnail_bytes(actual, expected)
 
