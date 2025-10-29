@@ -7,6 +7,8 @@ name = "gcode-thumbnail-tool"
 description = "A small tool to analyse and extract thumbnails rendered into GCODE files"
 version = "0.1.1"
 readme = {file = "README.md", content-type = "text/markdown"}
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE.txt"]
 
 authors = [
     {name = "Gina Häußge", email = "gina@octoprint.org"},
@@ -29,3 +31,8 @@ develop = [
     "pytest",
     "pre-commit",
 ]
+
+[project.urls]
+homepage = "https://github.com/OctoPrint/gcode-thumbnail-tool/"
+issues = "https://github.com/OctoPrint/gcode-thumbnail-tool/issues"
+source = "https://github.com/OctoPrint/gcode-thumbnail-tool/"
