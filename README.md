@@ -35,6 +35,7 @@ See `gcode_thumbnail_tool.py:main` and `tests/test_api.py` for more usage exampl
 <!--INSERT:help-->
 
 ```
+$ gcode-thumbnail-tool
 usage: gcode-thumbnail-tool [-h] [--verbose] {extract,analyse} ...
 
 A small CLI tool to extract thumbnail images from GCODE files.
@@ -56,6 +57,7 @@ options:
 <!--INSERT:extract-->
 
 ```
+$ gcode-thumbnail-tool extract --help
 usage: gcode-thumbnail-tool extract [-h] [-o OUTPUT] path
 
 positional arguments:
@@ -74,6 +76,7 @@ options:
 <!--INSERT:analyse-->
 
 ```
+$ gcode-thumbnail-tool analyse --help
 usage: gcode-thumbnail-tool analyse [-h] path
 
 positional arguments:
@@ -84,6 +87,21 @@ options:
 ```
 
 <!--/INSERT:analyse-->
+
+#### Example
+
+<!--INSERT:example-->
+
+```
+$ gcode-thumbnail-tool analyse tests/_files/prusa_2.9.3.gcode
+Found 4 thumbnails in tests/_files/prusa_2.9.3.gcode, in format "generic":
+	PNG @ 16x16
+	PNG @ 220x124
+	QOI @ 64x64
+	JPEG @ 64x64
+```
+
+<!--/INSERT:example-->
 
 ## Acknowledgements
 
