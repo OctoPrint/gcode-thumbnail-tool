@@ -84,3 +84,8 @@ options:
 ```
 
 <!--/INSERT:analyse-->
+
+## Acknowledgements
+
+`gcode-thumbnail-tool` is based on the [Slicer Thumbnails OctoPrint Plugin](https://github.com/jneilliii/OctoPrint-PrusaSlicerThumbnails) by jneilliii.
+Big thanks to him and all the contributors!
