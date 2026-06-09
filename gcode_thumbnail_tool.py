@@ -12,7 +12,7 @@ from typing import Optional
 from PIL import Image
 from PIL.Image import Image as PILImage
 
-FORMAT_LOOKUP = {"JPG": "JPEG", "QOI": "QOI", "PNG": "PNG"}
+FORMAT_LOOKUP = {"JPG": "JPEG", "QOI": "QOI", "PNG": "PNG", "png": "PNG", "jpg": "JPEG"}
 
 REGEX_GENERIC = re.compile(
     r"^; thumbnail(?P<suffix>(_(?P<format>JPG|QOI))?) begin \d+[x ]\d+ \d+$(?P<data>.*?)^; thumbnail(?P=suffix) end",
@@ -105,8 +105,8 @@ Single line? TODO: Need sample
 """
 
 REGEX_CREALITY = re.compile(
-    r"^; jpg begin.*$(?P<data>.+?)^; jpg end",
-    re.MULTILINE | re.VERBOSE,
+    r"^; (?P<format>jpg|png) begin.*?$(?P<data>.+?)^; (?P=format) end",
+    re.MULTILINE | re.DOTALL,
 )
 """
 Creality format:
@@ -114,6 +114,10 @@ Creality format:
     ; jpg begin ...
     ; <base64 encoded data>
     ; jpg end
+
+    ; png begin ...
+    ; <base64 encoded data>
+    ; png end
 
 Spread across multiple lines
 """
